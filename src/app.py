@@ -1,5 +1,5 @@
 import json
-from db import db, Task
+from db import db, Task, Subtask
 from flask import Flask, request
 
 db_filename = "todo.db"
@@ -57,6 +57,30 @@ def delete_task(task_id):
         db.session.delete(task)
         db.session.commit()
         return json.dumps({'success': True, 'data': task.serialize()}), 200
+    return json.dumps({'success': False, 'error': 'Task not found!'}), 404 
+
+@app.route('/tasks/<int:task_id>/subtasks/')
+def get_subtasks(task_id):
+    task = Task.query.filter_by(id=task_id).first()
+    if task is not None:
+        subtasks = [subtask.serialize() for subtask in task.subtasks]
+        return json.dumps({'success': True, 'data': subtasks}), 200
+    return json.dumps({'success': False, 'error': 'Task not found!'}), 404 
+
+@app.route('/tasks/<int:task_id>/subtasks/', methods=['POST'])
+def create_subtask(task_id):
+    task = Task.query.filter_by(id=task_id).first()
+    if task is not None:
+        post_body = json.loads(request.data)
+        subtask = Subtask(
+            description=post_body.get('description'),
+            done=bool(post_body.get('done')),
+            task_id=task.id
+        )
+        task.subtasks.append(subtask)
+        db.session.add(task)
+        db.session.commit()
+        return json.dumps({'success': True, 'data': subtask.serialize()})
     return json.dumps({'success': False, 'error': 'Task not found!'}), 404 
 
 if __name__ == '__main__':
