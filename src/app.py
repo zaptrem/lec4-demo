@@ -10,49 +10,53 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ECHO'] = True
 
 db.init_app(app)
-
+with app.app_context():
+    db.create_all()
+    
 @app.route('/')
 @app.route('/tasks/')
 def get_tasks():
-    res = {'success': True, 'data': Db.get_all_tasks()}
+    tasks = Task.query.all()
+    res = {'success': True, 'data': [task.serialize() for task in tasks]} 
     return json.dumps(res), 200
 
 @app.route('/tasks/', methods=['POST'])
 def create_task():
     post_body = json.loads(request.data)
-    description = post_body['description']
-    task = {
-        'id': Db.insert_task_table(description, False),
-        'description': description,
-        'done': False
-    }
-    return json.dumps({'success': True, 'data': task}), 201
+
+    task = Task(
+        description=post_body.get('description'),
+        done=bool(post_body.get('done'))
+    )
+    db.session.add(task)
+    db.session.commit()
+    return json.dumps({'success': True, 'data': task.serialize()}), 201
 
 @app.route('/tasks/<int:task_id>/')
 def get_task(task_id):
-    task = Db.get_task_by_id(task_id)
+    task = Task.query.filter_by(id=task_id).first() 
     if task is not None:
-        return json.dumps({'success': True, 'data': task}), 200
+        return json.dumps({'success': True, 'data': task.serialize()}), 200
     return json.dumps({'success': False, 'error': 'Task not found!'}), 404
 
 @app.route('/tasks/<int:task_id>/', methods=['POST'])
 def update_task(task_id):
-    post_body = json.loads(request.data)
-    description = post_body['description']
-    done = bool(post_body['done'])
-    Db.update_task_by_id(task_id, description, done)
-
-    task = Db.get_task_by_id(task_id)
+    task = Task.query.filter_by(id=task_id).first()
     if task is not None:
-        return json.dumps({'success': True, 'data': task}), 200
+        post_body = json.loads(request.data)
+        task.description = post_body.get('description', task.description)
+        task.done = bool(post_body.get('done', task.done))
+        db.session.commit()
+        return json.dumps({'success': True, 'data': task.serialize()}), 200
     return json.dumps({'success': False, 'error': 'Task not found!'}), 404
 
 @app.route('/tasks/<int:task_id>/', methods=['DELETE'])
 def delete_task(task_id):
-    task = Db.get_task_by_id(task_id)
+    task = Task.query.filter_by(id=task_id).first() 
     if task is not None:
-        Db.delete_task_by_id(task_id)
-        return json.dumps({'success': True, 'data': task}), 200
+        db.session.delete(task)
+        db.session.commit()
+        return json.dumps({'success': True, 'data': task.serialize()}), 200
     return json.dumps({'success': False, 'error': 'Task not found!'}), 404 
 
 if __name__ == '__main__':
