@@ -78,7 +78,7 @@ def create_subtask(task_id):
             task_id=task.id
         )
         task.subtasks.append(subtask)
-        db.session.add(task)
+        db.session.add(subtask)
         db.session.commit()
         return json.dumps({'success': True, 'data': subtask.serialize()})
     return json.dumps({'success': False, 'error': 'Task not found!'}), 404 
